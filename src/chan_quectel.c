@@ -99,18 +99,19 @@ void pvt_disconnect(struct pvt* pvt)
 {
     if (!PVT_NO_CHANS(pvt)) {
         struct cpvt* cpvt;
-        AST_LIST_TRAVERSE_SAFE_BEGIN(&(pvt->chans), cpvt, entry) {
-            at_hangup_immediately(cpvt, AST_CAUSE_NORMAL_UNSPECIFIED);
-            CPVT_SET_FLAG(cpvt, CALL_FLAG_DISCONNECTING);
-            CPVT_RESET_FLAG(cpvt, CALL_FLAG_NEED_HANGUP);
-            cpvt_change_state(cpvt, CALL_STATE_RELEASED, AST_CAUSE_NORMAL_UNSPECIFIED);
-        }
+        AST_LIST_TRAVERSE_SAFE_BEGIN(&(pvt->chans), cpvt, entry)
+            {
+                at_hangup_immediately(cpvt, AST_CAUSE_NORMAL_UNSPECIFIED);
+                CPVT_SET_FLAG(cpvt, CALL_FLAG_DISCONNECTING);
+                CPVT_RESET_FLAG(cpvt, CALL_FLAG_NEED_HANGUP);
+                cpvt_change_state(cpvt, CALL_STATE_RELEASED, AST_CAUSE_NORMAL_UNSPECIFIED);
+            }
         AST_LIST_TRAVERSE_SAFE_END;
     }
 
     if (pvt->initialized) {
-        if (!pvt->is_simcom && CONF_UNIQ(pvt, uac) == TRIBOOL_TRUE) {
-            at_disable_uac_immediately(pvt);
+        if (!pvt->is_simcom) {
+            at_disable_uac_immediately(pvt); /* Reset PCM session for next call */
         }
 
         if (pvt->is_simcom && CONF_UNIQ(pvt, uac) == TRIBOOL_TRUE && pvt->has_voice) {

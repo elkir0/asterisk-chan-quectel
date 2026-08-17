@@ -196,6 +196,14 @@ int at_enqueue_initialization(struct cpvt* cpvt)
 
     unsigned in, out;
     struct pvt* const pvt = cpvt->pvt;
+
+    /* Route URCs to configured port before init sequence */
+    {
+        at_queue_cmd_t qurccfg_cmd = ATQ_CMD_DECLARE_DYNI(CMD_AT);
+        if (!at_fill_generic_cmd(&qurccfg_cmd, "AT+QURCCFG=\"urcport\",\"%s\"\r", CONF_UNIQ(pvt, urcport))) {
+            at_queue_insert(cpvt, &qurccfg_cmd, 1u, 0);
+        }
+    }
     at_queue_cmd_t cmds[ARRAY_LEN(st_cmds)];
     at_queue_cmd_t dyn_cmd;
     int dyn_handled;
@@ -302,8 +310,8 @@ int at_enqueue_initialization_quectel(struct cpvt* cpvt, unsigned int dsci)
     DECLARE_AT_CMD(dsci, "^DSCI=1");
     DECLARE_AT_CMD(dsci_off, "^DSCI=0");
 
-    DECLARE_AT_CMD(qindcfg_csq, "+QINDCFG=\"csq\",1,0");
-    DECLARE_AT_CMD(qindcfg_act, "+QINDCFG=\"act\",1,0");
+    DECLARE_AT_CMD(qindcfg_csq, "+QINDCFG=\"csq\",0,0");
+    DECLARE_AT_CMD(qindcfg_act, "+QINDCFG=\"act\",0,0");
     DECLARE_AT_CMD(qindcfg_ring, "+QINDCFG=\"ring\",0,0");
 
     DECLARE_AT_CMD(qtonedet_0, "+QTONEDET=0");
@@ -334,15 +342,25 @@ int at_enqueue_initialization_quectel(struct cpvt* cpvt, unsigned int dsci)
         ATQ_CMD_DECLARE_ST(CMD_AT_CVOICE, qpcmv), /* read the current voice mode, and return sampling rate、data bit、frame period */
         ccinfo_cmds[dsci ? 2 : 3],
         ccinfo_cmds[dsci ? 1 : 0],
-        ATQ_CMD_DECLARE_ST(CMD_AT_QINDCFG_CSQ, qindcfg_csq),
-        ATQ_CMD_DECLARE_ST(CMD_AT_QINDCFG_ACT, qindcfg_act),
-        ATQ_CMD_DECLARE_ST(CMD_AT_QINDCFG_RING, qindcfg_ring),
+        ATQ_CMD_DECLARE_STI(CMD_AT_QINDCFG_CSQ, qindcfg_csq),
+        ATQ_CMD_DECLARE_STI(CMD_AT_QINDCFG_ACT, qindcfg_act),
+        ATQ_CMD_DECLARE_STI(CMD_AT_QINDCFG_RING, qindcfg_ring),
         tonedet_cmds[dtmf ? 1 : 0],
         ATQ_CMD_DECLARE_ST(CMD_AT_CEREG_INIT, cereg_init),
         ATQ_CMD_DECLARE_ST(CMD_AT_FINAL, at),
     };
 
-    return at_queue_insert_const(cpvt, cmds, ARRAY_LEN(cmds), 0);
+    if (at_queue_insert_const(cpvt, cmds, ARRAY_LEN(cmds), 0)) {
+        return -1;
+    }
+
+    /* Route URCs to configured port after init completes */
+    at_queue_cmd_t qurccfg_cmd = ATQ_CMD_DECLARE_DYNI(CMD_AT);
+    if (!at_fill_generic_cmd(&qurccfg_cmd, "AT+QURCCFG=\"urcport\",\"%s\"\r", CONF_UNIQ(pvt, urcport))) {
+        at_queue_insert(cpvt, &qurccfg_cmd, 1u, 0);
+    }
+
+    return 0;
 }
 
 int at_enqueue_initialization_simcom(struct cpvt* cpvt)
@@ -945,6 +963,15 @@ int at_enqueue_ping(struct cpvt* cpvt)
 
     if (CONF_SHARED(pvt, query_time)) {
         ping_cmd = pvt->is_simcom ? PING_SIMCOM : PING_QUECTEL;
+    }
+
+    /* Poll AT+CLCC while calls are in dialing/alerting state.
+     * Some modems (e.g. Quectel EC25 with VoLTE) do not send unsolicited
+     * call state notifications, so we need to poll to detect answer.
+     * Once active, stop polling — the modem may drop the voice entry from
+     * CLCC while keeping IMS bearers. Rely on NO CARRIER for hangup. */
+    if (PVT_STATE(pvt, chan_count[CALL_STATE_DIALING]) || PVT_STATE(pvt, chan_count[CALL_STATE_ALERTING])) {
+        at_enqueue_clcc(cpvt);
     }
 
     switch (ping_cmd) {
