@@ -267,6 +267,13 @@ static int at_response_ok(struct pvt* const pvt, const at_res_t at_res, const at
                     break;
 
                 default:
+                    // uac=ext: voice stays on the module PCM interface (AT+QPCMV=0,
+                    // power-on value), no QPCMV command. Upstream never marked the voice
+                    // available here, so every outgoing call was refused (Homenichat OS,
+                    // EC25 on the Yeastar P550 SAI5 bus).
+                    pvt->has_voice = 1;
+                    at_enqueue_qgains(&pvt->sys_chan, CONF_SHARED(pvt, txgain), CONF_SHARED(pvt, rxgain));
+                    at_enqueue_query_qgains(&pvt->sys_chan);
                     break;
             }
             break;
@@ -2428,6 +2435,11 @@ static void at_response_qpcmv(struct pvt* const pvt, const struct ast_str* const
     }
 
     ast_debug(1, "[%s] Voice configuration: %s [%s]\n", PVT_ID(pvt), qpcmv2str(mode), S_COR(enabled, "enabled", "disabled"));
+
+    if (enabled && CONF_UNIQ(pvt, uac) == TRIBOOL_NONE) {
+        ast_log(LOG_WARNING, "[%s] uac=ext but voice routed to USB (%s): PCM interface silent, AT+QPCMV=0 needed\n", PVT_ID(pvt),
+                qpcmv2str(mode));
+    }
 }
 
 static void show_module_time(struct pvt* const pvt)
