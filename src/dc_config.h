@@ -93,6 +93,7 @@ typedef struct dc_uconfig {
     char alsadev[DEVNAMELEN];   /*!< ALSA audio device name */
     tristate_bool_t uac;        /*!< handle audio by audio device (UAC) */
     unsigned int slin16:1;      /*!< SLIN16 audio format */
+    unsigned int ext_native:1;  /*!< uac=ext with an explicit slin16: module rate (8/16 kHz), not slin48 */
 } dc_uconfig_t;
 
 /* all Config settings join in one place */

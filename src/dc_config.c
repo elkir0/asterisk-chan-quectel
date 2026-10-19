@@ -172,6 +172,9 @@ static int dc_uconfig_fill(struct ast_config* cfg, const char* cat, struct dc_uc
             break;
     }
     config->slin16 = (unsigned int)slin16;
+    // uac=ext uses slin48 (external 48 kHz sound card); an explicit slin16=no|yes asks for the
+    // module rate instead: 8 or 16 kHz, e.g. the EC25 PCM bus wired to the SoC (Homenichat OS)
+    config->ext_native = (uac == TRIBOOL_NONE && slin16_str) ? 1u : 0u;
 
     return 0;
 }
@@ -352,7 +355,8 @@ static int dc_sconfig_compare(const struct dc_sconfig* const cfg1, const struct 
 static int dc_uconfig_compare(const struct dc_uconfig* const cfg1, const struct dc_uconfig* const cfg2)
 {
     return strcmp(cfg1->id, cfg2->id) || strcmp(cfg1->audio_tty, cfg2->audio_tty) || strcmp(cfg1->data_tty, cfg2->data_tty) ||
-           strcmp(cfg1->alsadev, cfg2->alsadev) || cfg1->uac != cfg2->uac || cfg1->slin16 != cfg2->slin16;
+           strcmp(cfg1->alsadev, cfg2->alsadev) || cfg1->uac != cfg2->uac || cfg1->slin16 != cfg2->slin16 ||
+           cfg1->ext_native != cfg2->ext_native;
 }
 
 int pvt_config_compare(const struct pvt_config* const cfg1, const struct pvt_config* const cfg2)

@@ -1343,6 +1343,9 @@ const struct ast_format* pvt_get_audio_format(const struct pvt* const pvt)
     if (pvt->is_simcom) {
         switch (CONF_UNIQ(pvt, uac)) {
             case TRIBOOL_NONE:
+                if (CONF_UNIQ(pvt, ext_native)) {
+                    return CONF_UNIQ(pvt, slin16) ? ast_format_slin16 : ast_format_slin;
+                }
                 return ast_format_slin48;
 
             default:
@@ -1351,6 +1354,9 @@ const struct ast_format* pvt_get_audio_format(const struct pvt* const pvt)
     } else {
         switch (CONF_UNIQ(pvt, uac)) {
             case TRIBOOL_NONE:
+                if (CONF_UNIQ(pvt, ext_native)) {
+                    return CONF_UNIQ(pvt, slin16) ? ast_format_slin16 : ast_format_slin;
+                }
                 return ast_format_slin48;
 
             default:
