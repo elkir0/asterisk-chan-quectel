@@ -19,7 +19,13 @@
 
 static inline const char* enum2str_def(const unsigned value, const char* const names[], const unsigned items, const char* const def)
 {
-    return S_COR(value < items, names[value], def);
+    // bounds first: S_COR() evaluates its second argument before the condition, so
+    // names[value] was read even out of range (gsm_reg_status = -1 before any +CREG,
+    // e.g. no SIM: "quectel show device state" crashed Asterisk)
+    if (value >= items || ast_strlen_zero(names[value])) {
+        return def;
+    }
+    return names[value];
 }
 
 static inline const char* enum2str(const unsigned value, const char* const names[], const unsigned items)
